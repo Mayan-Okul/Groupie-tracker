@@ -51,9 +51,9 @@ func main() {
 	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", h.Index)
-	mux.HandleFunc("/artist", h.ArtistDetail)
-	mux.HandleFunc("/api/search", h.Search)
+	mux.HandleFunc("/", h.Recover(h.Index))
+	mux.HandleFunc("/artist", h.Recover(h.ArtistDetail))
+	mux.HandleFunc("/api/search", h.Recover(h.Search))
 
 	staticDir := http.Dir("static")
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(staticDir)))

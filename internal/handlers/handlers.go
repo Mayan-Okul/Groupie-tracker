@@ -195,3 +195,18 @@ func prettyLocation(loc string) string {
 	}
 	return strings.Join(words, " ")
 }
+
+// Recover wraps a handler so that if it panics — a nil pointer, an index
+// out of range, anything unexpected — the server catches it, logs it, and
+// returns a 500 to that one request instead of crashing the whole process.
+func (h *Handler) Recover(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if rec := recover(); rec != nil {
+				log.Printf("panic recovered on %s %s: %v", r.Method, r.URL.Path, rec)
+				h.renderError(w, http.StatusInternalServerError, "Something went wrong on our end.")
+			}
+		}()
+		next(w, r)
+	}
+}
