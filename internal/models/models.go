@@ -1,6 +1,8 @@
-package models
 // Package models defines the data structures used to decode the
 // Groupie Trackers API responses and the view models handed to templates.
+package models
+
+// Artist represents a single band/artist as returned by the /api/artists endpoint.
 type Artist struct {
 	ID           int      `json:"id"`
 	Name         string   `json:"name"`
@@ -13,21 +15,25 @@ type Artist struct {
 	Relations    string   `json:"relations"`
 }
 
+// LocationEntry is one artist's list of concert locations, from /api/locations.
 type LocationEntry struct {
 	ID        int      `json:"id"`
 	Locations []string `json:"locations"`
 	Dates     string   `json:"dates"`
 }
 
+// LocationsIndex wraps the "index" array the locations endpoint returns.
 type LocationsIndex struct {
-    Index []LocationEntry `json:"index"`
+	Index []LocationEntry `json:"index"`
 }
 
+// DateEntry is one artist's list of concert dates, from /api/dates.
 type DateEntry struct {
 	ID    int      `json:"id"`
 	Dates []string `json:"dates"`
 }
 
+// DatesIndex wraps the "index" array the dates endpoint returns.
 type DatesIndex struct {
 	Index []DateEntry `json:"index"`
 }
@@ -47,11 +53,12 @@ type RelationsIndex struct {
 type ArtistDetail struct {
 	Artist         Artist
 	DatesLocations map[string][]string
+	AllDates       []string // raw list from the /dates endpoint, shown separately from relation data
 }
 
 // SearchResult is a single suggestion returned by the live search endpoint.
 type SearchResult struct {
 	ArtistID int    `json:"artistId"`
-	Label    string `json:"label"`
-	Type     string `json:"type"`
+	Label    string `json:"label"` // text shown to the user, e.g. "Queen (band)"
+	Type     string `json:"type"`  // artist/band, member, location, first album, creation date
 }

@@ -45,6 +45,15 @@
       </div>
     </div>
 
+    {{if .AllDates}}
+    <h2 class="section-title">All Recorded Dates</h2>
+    <div class="members">
+      {{range .AllDates}}
+      <span class="member-chip">{{.}}</span>
+      {{end}}
+    </div>
+    {{end}}
+
     <h2 class="section-title">Tour History</h2>
     {{if .DatesLocations}}
     <table class="tour-table">

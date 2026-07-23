@@ -42,7 +42,22 @@ func NewFromFiles(store DataStore, patterns ...string) (*Handler, error) {
 	return &Handler{store: store, templates: tmpl}, nil
 }
 
-// Index renders the home page: a grid of every artist.
+// Recover wraps a handler so that if it panics — a nil pointer, an index
+// out of range, anything unexpected — the server catches it, logs it, and
+// returns a 500 to that one request instead of crashing the whole process.
+func (h *Handler) Recover(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if rec := recover(); rec != nil {
+				log.Printf("panic recovered on %s %s: %v", r.Method, r.URL.Path, rec)
+				h.renderError(w, http.StatusInternalServerError, "Something went wrong on our end.")
+			}
+		}()
+		next(w, r)
+	}
+}
+
+// Index renders the home page: a searchable grid of every artist.
 func (h *Handler) Index(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
 		h.renderError(w, http.StatusNotFound, "Page not found.")
@@ -64,32 +79,6 @@ func (h *Handler) Index(w http.ResponseWriter, r *http.Request) {
 		"Title":   "Groupie Trackers",
 		"Artists": artists,
 	})
-}
-
-// render executes a named template and writes it to w.
-func (h *Handler) render(w http.ResponseWriter, name string, data interface{}) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := h.templates.ExecuteTemplate(w, name, data); err != nil {
-		log.Printf("template %s error: %v", name, err)
-		h.renderError(w, http.StatusInternalServerError, "Failed to render page.")
-	}
-}
-
-// renderError writes an error page. Falls back to plain text if templates
-// aren't available, so this function itself can never fail.
-func (h *Handler) renderError(w http.ResponseWriter, status int, message string) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.WriteHeader(status)
-	if h.templates != nil && h.templates.Lookup("error.html") != nil {
-		err := h.templates.ExecuteTemplate(w, "error.html", map[string]interface{}{
-			"Code":    status,
-			"Message": message,
-		})
-		if err == nil {
-			return
-		}
-	}
-	w.Write([]byte("<h1>" + strconv.Itoa(status) + "</h1><p>" + message + "</p>"))
 }
 
 // ArtistDetail renders the page for one artist, merging in their concert
@@ -116,6 +105,7 @@ func (h *Handler) ArtistDetail(w http.ResponseWriter, r *http.Request) {
 	detail := models.ArtistDetail{
 		Artist:         artist,
 		DatesLocations: h.store.RelationsFor(id),
+		AllDates:       h.store.DatesFor(id),
 	}
 
 	h.render(w, "artist.html", map[string]interface{}{
@@ -181,7 +171,8 @@ func (h *Handler) Search(w http.ResponseWriter, r *http.Request) {
 }
 
 // prettyLocation turns the API's "san_francisco-usa" style strings into
-// "San Francisco-usa" for display.
+// "San Francisco-usa" for display. strings.Title is deprecated, so this
+// does the word-capitalization by hand.
 func prettyLocation(loc string) string {
 	loc = strings.ReplaceAll(loc, "_", " ")
 	words := strings.Fields(loc)
@@ -196,17 +187,29 @@ func prettyLocation(loc string) string {
 	return strings.Join(words, " ")
 }
 
-// Recover wraps a handler so that if it panics — a nil pointer, an index
-// out of range, anything unexpected — the server catches it, logs it, and
-// returns a 500 to that one request instead of crashing the whole process.
-func (h *Handler) Recover(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		defer func() {
-			if rec := recover(); rec != nil {
-				log.Printf("panic recovered on %s %s: %v", r.Method, r.URL.Path, rec)
-				h.renderError(w, http.StatusInternalServerError, "Something went wrong on our end.")
-			}
-		}()
-		next(w, r)
+// render executes a named template and writes it to w. Template execution
+// errors are logged and turned into a 500 rather than a half-written page.
+func (h *Handler) render(w http.ResponseWriter, name string, data interface{}) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := h.templates.ExecuteTemplate(w, name, data); err != nil {
+		log.Printf("template %s error: %v", name, err)
+		h.renderError(w, http.StatusInternalServerError, "Failed to render page.")
 	}
+}
+
+// renderError writes a plain, dependency-free error page so it can never
+// itself fail even if the main templates are broken.
+func (h *Handler) renderError(w http.ResponseWriter, status int, message string) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(status)
+	if h.templates != nil && h.templates.Lookup("error.html") != nil {
+		err := h.templates.ExecuteTemplate(w, "error.html", map[string]interface{}{
+			"Code":    status,
+			"Message": message,
+		})
+		if err == nil {
+			return
+		}
+	}
+	w.Write([]byte("<h1>" + strconv.Itoa(status) + "</h1><p>" + message + "</p>"))
 }
