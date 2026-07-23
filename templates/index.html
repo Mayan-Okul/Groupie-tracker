@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{.Title}}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Groupie<span>Trackers</span></div>
+    <div class="search-wrap">
+      <input id="search-input" type="text" placeholder="Search artists, members, locations, albums…" autocomplete="off">
+      <div id="search-results"></div>
+    </div>
+  </header>
+
+  <main>
+    <h1 class="page-title">All Artists</h1>
+
+    {{if .Artists}}
+    <div class="grid">
+      {{range .Artists}}
+      <a class="card" href="/artist?id={{.ID}}">
+        <img src="{{.Image}}" alt="{{.Name}}" loading="lazy">
+        <div class="card-body">
+          <h3>{{.Name}}</h3>
+          <div class="meta">Since {{.CreationDate}} · First album {{.FirstAlbum}}</div>
+          <span class="badge">{{len .Members}} member{{if ne (len .Members) 1}}s{{end}}</span>
+        </div>
+      </a>
+      {{end}}
+    </div>
+    {{else}}
+    <div class="empty-state">No artists to show right now.</div>
+    {{end}}
+  </main>
+
+  <footer>Data courtesy of the Groupie Trackers API · built in Go</footer>
+  <script src="/static/script.js"></script>
+</body>
+</html>
