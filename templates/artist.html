@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{.Title}} · Groupie Trackers</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Groupie<span>Trackers</span></div>
+    <div class="search-wrap">
+      <input id="search-input" type="text" placeholder="Search artists, members, locations, albums…" autocomplete="off">
+      <div id="search-results"></div>
+    </div>
+  </header>
+
+  <main>
+    <a class="back-link" href="/">&larr; Back to all artists</a>
+
+    {{with .Detail}}
+    <div class="detail-hero">
+      <img src="{{.Artist.Image}}" alt="{{.Artist.Name}}">
+      <div>
+        <h1 class="page-title">{{.Artist.Name}}</h1>
+        <div class="stat-row">
+          <div class="stat">
+            <div class="label">Active Since</div>
+            <div class="value">{{.Artist.CreationDate}}</div>
+          </div>
+          <div class="stat">
+            <div class="label">First Album</div>
+            <div class="value">{{.Artist.FirstAlbum}}</div>
+          </div>
+          <div class="stat">
+            <div class="label">Members</div>
+            <div class="value">{{len .Artist.Members}}</div>
+          </div>
+        </div>
+        <div class="members">
+          {{range .Artist.Members}}
+          <span class="member-chip">{{.}}</span>
+          {{end}}
+        </div>
+      </div>
+    </div>
+
+    <h2 class="section-title">Tour History</h2>
+    {{if .DatesLocations}}
+    <table class="tour-table">
+      <thead>
+        <tr><th>Location</th><th>Dates</th></tr>
+      </thead>
+      <tbody>
+        {{range $location, $dates := .DatesLocations}}
+        <tr>
+          <td>{{$location}}</td>
+          <td>{{range $i, $d := $dates}}{{if $i}}, {{end}}{{$d}}{{end}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+    {{else}}
+    <div class="empty-state">No tour data available for this artist.</div>
+    {{end}}
+    {{end}}
+  </main>
+
+  <footer>Data courtesy of the Groupie Trackers API · built in Go</footer>
+  <script src="/static/script.js"></script>
+</body>
+</html>
