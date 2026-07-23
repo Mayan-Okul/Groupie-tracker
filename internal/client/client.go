@@ -74,3 +74,121 @@ func fetchDates() (models.DatesIndex, error) {
 	}
 	return dates, nil
 }
+
+// Store holds the fully-loaded, merged dataset in memory so every HTTP
+// request served by this app is answered from RAM instead of hitting the
+// upstream API each time. It is safe for concurrent reads/writes.
+type Store struct {
+	mu        sync.RWMutex
+	artists   []models.Artist
+	byID      map[int]models.Artist
+	relations map[int]map[string][]string
+	locations map[int][]string
+	dates     map[int][]string
+	loadedAt  time.Time
+}
+
+// NewStore builds an empty store. Call Refresh to populate it.
+func NewStore() *Store {
+	return &Store{
+		byID:      make(map[int]models.Artist),
+		relations: make(map[int]map[string][]string),
+	}
+}
+
+// Refresh fetches all four API resources and atomically swaps them into the
+// store. If any request fails, the store keeps serving its previous (stale)
+// data rather than being left half-updated or empty.
+func (s *Store) Refresh() error {
+	artists, err := fetchArtists()
+	if err != nil {
+		return fmt.Errorf("fetch artists: %w", err)
+	}
+	relations, err := fetchRelations()
+	if err != nil {
+		return fmt.Errorf("fetch relations: %w", err)
+	}
+	locs, err := fetchLocations()
+	if err != nil {
+		return fmt.Errorf("fetch locations: %w", err)
+	}
+	dates, err := fetchDates()
+	if err != nil {
+		return fmt.Errorf("fetch dates: %w", err)
+	}
+
+	byID := make(map[int]models.Artist, len(artists))
+	for _, a := range artists {
+		byID[a.ID] = a
+	}
+
+	relByID := make(map[int]map[string][]string, len(relations.Index))
+	for _, r := range relations.Index {
+		relByID[r.ID] = r.DatesLocations
+	}
+
+	locByID := make(map[int][]string, len(locs.Index))
+	for _, l := range locs.Index {
+		locByID[l.ID] = l.Locations
+	}
+
+	dateByID := make(map[int][]string, len(dates.Index))
+	for _, d := range dates.Index {
+		dateByID[d.ID] = d.Dates
+	}
+
+	s.mu.Lock()
+	s.artists = artists
+	s.byID = byID
+	s.relations = relByID
+	s.locations = locByID
+	s.dates = dateByID
+	s.loadedAt = time.Now()
+	s.mu.Unlock()
+	return nil
+}
+
+// Ready reports whether the store has ever been successfully populated.
+func (s *Store) Ready() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return len(s.artists) > 0
+}
+
+// Artists returns a copy of the artist slice.
+func (s *Store) Artists() []models.Artist {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]models.Artist, len(s.artists))
+	copy(out, s.artists)
+	return out
+}
+
+// ArtistByID returns a single artist and whether it was found.
+func (s *Store) ArtistByID(id int) (models.Artist, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	a, ok := s.byID[id]
+	return a, ok
+}
+
+// RelationsFor returns the location->dates map for an artist ID.
+func (s *Store) RelationsFor(id int) map[string][]string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.relations[id]
+}
+
+// LocationsFor returns the raw list of concert locations for an artist ID.
+func (s *Store) LocationsFor(id int) []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.locations[id]
+}
+
+// DatesFor returns the raw list of concert dates for an artist ID.
+func (s *Store) DatesFor(id int) []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.dates[id]
+}

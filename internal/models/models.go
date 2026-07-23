@@ -19,7 +19,7 @@ type LocationEntry struct {
 	Dates     string   `json:"dates"`
 }
 
-type LocationIndex struct {
+type LocationsIndex struct {
     Index []LocationEntry `json:"index"`
 }
 
